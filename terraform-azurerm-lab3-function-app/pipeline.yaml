@@ -1,0 +1,109 @@
+name: $(BuildDefinitionName).$(Build.Reason)$(Rev:.r)
+
+resources:
+  repositories:
+  - repository: devops
+    type: github
+    name: lab3au/pipeline-templates
+    endpoint: lab3au
+
+variables:  
+  - name: agent_folder
+    value: lab3
+  - name: terraform_source_folder
+    value: 'TF' 
+  # Storage account details for Terraform state
+  - name: container
+    value: 'lab3-bedrock-lab3-azuredevops-terraform-azurerm-module-template-terraform-state' 
+  # terraform key, file name to store the state in
+  - name: statefile
+    value: 'lab3-bedrock-lab3-azuredevops-terraform-azurerm-module-template-dev.tfstate' 
+  - group: 'terraform-azurerm-sub-dev1' 
+  - group: 'terraform_remote_state'
+          
+trigger:
+  branches:
+    include:
+    - master
+    - feature/*
+  paths:
+    include:
+    - '*'
+    
+stages:
+
+# --------------------------------------------------------------------------------------------------
+# Terraform Plan
+# --------------------------------------------------------------------------------------------------
+- stage: Plan
+  condition: ne(variables['destroy'], 'true')
+  jobs:
+  - job: prepare
+    displayName: Initial Checks and Preparation
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: git diff-tree --no-commit-id --name-only -r $(Build.SourceVersion)
+      workingDirectory: '$(Agent.BuildDirectory)/s'
+      displayName: 'List files changed in this commit'
+
+    - script: echo the github_token is $(github_token_for_plan)
+      displayName: 'Log github_token'
+      env:
+        GITHUB_TOKEN: $(github_token_for_plan)
+
+  - template: terraform/plan.yaml@devops
+    parameters:
+      pool:
+        vmImage: 'ubuntu-latest'   
+      github_token_passed_in: $(github_token_for_plan)
+        
+# --------------------------------------------------------------------------------------------------
+# Terraform Apply
+# --------------------------------------------------------------------------------------------------
+- stage: Apply
+  condition: |
+    and
+    (
+      ne(variables['destroy'], 'true'),
+      eq(variables['Build.SourceBranch'], 'refs/heads/master')
+    )  
+  jobs:
+  - job: prepare
+    displayName: Initial Checks and Preparation
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - script: echo the github_token is $(github_token_for_plan)
+      displayName: 'Log github_token'
+      env:
+        GITHUB_TOKEN: $(github_token_for_plan)
+        
+  - template: terraform/apply.yaml@devops 
+    parameters:
+      pool:
+        vmImage: 'ubuntu-latest'
+      Environment: TerraformApproval
+      github_token_passed_in: $(github_token_for_plan)
+
+# --------------------------------------------------------------------------------------------------
+# Terraform Destroy
+# --------------------------------------------------------------------------------------------------
+- stage: Destroy
+  condition: |
+    and
+    (
+      eq(variables['destroy'], 'true'),
+      eq(variables['Build.SourceBranchName'], 'master')
+    )
+  jobs:
+    - template: terraform/destroy.yaml@devops 
+      parameters:
+        ACI: $(ARM_CLIENT_ID)
+        ACS: $(ARM_CLIENT_SECRET)
+        TF_DEBUG: ''
+        AzLogin: true
+        pool:
+          vmImage: ubuntu-latest
+        Environment: TerraformApproval
+        github_token_passed_in: $(github_token_for_plan)
