@@ -47,16 +47,16 @@ stages:
       workingDirectory: '$(Agent.BuildDirectory)/s'
       displayName: 'List files changed in this commit'
 
-    - script: echo the github_token is $(github_token_for_plan)
+    - script: echo the github_token is $(GITHUB_TOKEN_FOR_PLAN)
       displayName: 'Log github_token'
       env:
-        GITHUB_TOKEN: $(github_token_for_plan)
+        GITHUB_TOKEN: $(GITHUB_TOKEN_FOR_PLAN)
 
   - template: terraform/plan.yaml@devops
     parameters:
       pool:
         vmImage: 'ubuntu-latest'   
-      github_token_passed_in: $(github_token_for_plan)
+      github_token_passed_in: $(GITHUB_TOKEN_FOR_PLAN)
         
 # --------------------------------------------------------------------------------------------------
 # Terraform Apply
@@ -74,17 +74,17 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - script: echo the github_token is $(github_token_for_plan)
+    - script: echo the github_token is $(GITHUB_TOKEN_FOR_PLAN)
       displayName: 'Log github_token'
       env:
-        GITHUB_TOKEN: $(github_token_for_plan)
+        GITHUB_TOKEN: $(GITHUB_TOKEN_FOR_PLAN)
         
   - template: terraform/apply.yaml@devops 
     parameters:
       pool:
         vmImage: 'ubuntu-latest'
       Environment: TerraformApproval
-      github_token_passed_in: $(github_token_for_plan)
+      github_token_passed_in: $(GITHUB_TOKEN_FOR_PLAN)
 
 # --------------------------------------------------------------------------------------------------
 # Terraform Destroy
@@ -106,4 +106,4 @@ stages:
         pool:
           vmImage: ubuntu-latest
         Environment: TerraformApproval
-        github_token_passed_in: $(github_token_for_plan)
+        github_token_passed_in: $(GITHUB_TOKEN_FOR_PLAN)
